@@ -1,0 +1,49 @@
+server:
+  port: 9000
+management:
+  endpoint:
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: book-route
+          uri: ${BOOK_SERVICE_URL:http://localhost:9001}
+          predicates:
+            - Path=/books/**
+          filters:
+            - AddRequestHeader=X-Tenant,acme
+            - AddResponseHeader=X-Genre, fantasy
+            - name: CircuitBreaker
+              args:
+                name: bookService
+                fallbackUri: forward:/books-fallback
+            - name: Retry
+              args:
+                retries: 3
+                methods: GET
+                backoff:
+                  firstBackoff: 50
+                  maxBackoff: 500
+
+resilienc4j:
+  circuitBreaker:
+    instances:
+      bookService:
+        slidingWindowSize: 10
+        permittedNumberOfCallsInHalfOpenState: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        registerHealthIndicator: true
+  timelimiter:
+    instances:
+      bookService:
+        timeoutDuration: 2s
